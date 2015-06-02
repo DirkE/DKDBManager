@@ -83,6 +83,10 @@ static BOOL _needForcedUpdate = NO;
     // Setup the coredata stack
     [MagicalRecord setupCoreDataStackWithAutoMigratingSqliteStoreNamed:databaseName];
 
+    // Store default context
+    DKDBManager *manager = [DKDBManager sharedInstance];
+    manager->_context = [NSManagedObjectContext MR_contextForCurrentThread];
+
     return didResetDB;
 }
 
@@ -146,13 +150,15 @@ static BOOL _needForcedUpdate = NO;
         [manager->_entities[className] addObject:[entity performSelector:@selector(uniqueIdentifier)]];
     }
 }
-
+// TODO: remove and replace with block.
 + (void)save {
     [self saveToPersistentStoreWithCompletion:nil];
 }
 
+// TODO: remove and replace with block.
 + (void)saveToPersistentStoreWithCompletion:(void (^)(BOOL success, NSError *error))completionBlock {
-    [[NSManagedObjectContext MR_contextForCurrentThread] MR_saveToPersistentStoreWithCompletion:^(BOOL success, NSError *error) {
+    DKDBManager *manager = [DKDBManager sharedInstance];
+    [manager->_context MR_saveToPersistentStoreWithCompletion:^(BOOL success, NSError *error) {
         if (self.verbose)
             [self dump];
         if (completionBlock)
@@ -160,10 +166,22 @@ static BOOL _needForcedUpdate = NO;
     }];
 }
 
+// TODO: remove and replace with block.
 + (void)saveToPersistentStoreAndWait {
-    [[NSManagedObjectContext MR_contextForCurrentThread] MR_saveToPersistentStoreAndWait];
-    if (self.verbose)
+    DKDBManager *manager = [DKDBManager sharedInstance];
+    [manager->_context MR_saveToPersistentStoreAndWait];
+    if (self.verbose) {
         [self dump];
+    }
+}
+
++ (void)saveBlockAndWait:(void(^)(NSManagedObjectContext *localContext))block {
+    [MagicalRecord saveWithBlockAndWait:^(NSManagedObjectContext *localContext) {
+        block(localContext);
+        if (self.verbose) {
+            [self dump];
+        }
+    }];
 }
 
 #pragma mark - DEBUG methods
