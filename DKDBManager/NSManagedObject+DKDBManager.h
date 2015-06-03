@@ -25,7 +25,8 @@ typedef NS_ENUM(NSInteger, DKDBManagedObjectState) {
 #pragma mark - READ
 
 - (id)uniqueIdentifier;
-- (void)saveEntityAsNotDeprecated;
+- (void)saveCurrentEntityAsNotDeprecated;
+- (void)saveCurrentAndChildEntitiesAsNotDeprecated;
 - (NSString *)invalidReason;
 - (BOOL)shouldUpdateEntityWithDictionary:(NSDictionary *)dictionary;
 + (BOOL)verbose;

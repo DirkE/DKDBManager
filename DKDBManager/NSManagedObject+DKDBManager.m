@@ -27,6 +27,7 @@
         entity = [self MR_createEntity];
         [entity updateWithDictionary:dictionary];
         status = DKDBManagedObjectStateCreate;
+
     } else if (DKDBManager.needForcedUpdate || (DKDBManager.allowUpdate && [entity shouldUpdateEntityWithDictionary:dictionary])) {
         // update attributes
         [entity updateWithDictionary:dictionary];
@@ -40,13 +41,12 @@
         status = DKDBManagedObjectStateDelete;
     }
 
-    DKLog(DKDBManager.verbose && [self verbose] && status == DKDBManagedObjectStateCreate, @"Creating %@ %@", NSStringFromClass([self class]), entity);
-    DKLog(DKDBManager.verbose && [self verbose] && status == DKDBManagedObjectStateUpdate, @"Updating %@ %@", NSStringFromClass([self class]), entity);
+    // Log and save current with or without child entities.
+    [self saveEntityAfterCreation:entity status:status];
 
-    // if entity exists then save the entity's id.
-    [entity saveEntityAsNotDeprecated];
-
-    if (completion) completion(entity, status);
+    if (completion) {
+        completion(entity, status);
+    }
     return entity;
 }
 
@@ -63,19 +63,60 @@
     return entities;
 }
 
-#pragma mark - READ
+#pragma mark - SAVE
 
-- (id)uniqueIdentifier {
-    return self.objectID;
++ (void)saveEntityAfterCreation:(id)entity status:(DKDBManagedObjectState)status {
+    //
+    // In case of a Database matching an API it is necessary to store entities as not deprecated.
+    // Depending on the state different thing occurs:
+    // If the state is `.Create` or `.Update`:
+    // If the state is `.Save`:
+    // If the state is `.Delete`:
+    //
+    switch (status) {
+        case DKDBManagedObjectStateSave:
+            DKLog(DKDBManager.verbose && [self verbose], @"Saving %@ %@", NSStringFromClass([self class]), entity);
+            [entity saveCurrentAndChildEntitiesAsNotDeprecated];
+            break;
+        case DKDBManagedObjectStateCreate:
+            DKLog(DKDBManager.verbose && [self verbose], @"Creating %@ %@", NSStringFromClass([self class]), entity);
+            [entity saveCurrentEntityAsNotDeprecated];
+            break;
+        case DKDBManagedObjectStateUpdate:
+            DKLog(DKDBManager.verbose && [self verbose], @"Updating %@ %@", NSStringFromClass([self class]), entity);
+            [entity saveCurrentEntityAsNotDeprecated];
+            break;
+        case DKDBManagedObjectStateDelete:
+            DKLog(DKDBManager.verbose && [self verbose], @"Deleting %@ %@", NSStringFromClass([self class]), entity);
+            break;
+        default:
+            break;
+    }
+
 }
 
-- (void)saveEntityAsNotDeprecated {
+- (void)saveCurrentAndChildEntitiesAsNotDeprecated {
     //
-    // Method to save/store the current object and all its child relations as not deprecated.
+    // Method to save/store the current object AND all its child relations as not deprecated.
+    // See: DKDBManager
+    //
+
+    [self saveCurrentEntityAsNotDeprecated];
+}
+
+- (void)saveCurrentEntityAsNotDeprecated {
+    //
+    // Method to save/store the current object as not deprecated.
     // See: DKDBManager
     //
 
     [DKDBManager saveEntityAsNotDeprecated:self];
+}
+
+#pragma mark - READ
+
+- (id)uniqueIdentifier {
+    return self.objectID;
 }
 
 - (NSString *)invalidReason {
